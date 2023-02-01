@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates an EC2 Bastion Host
+
+Parameters:
+    BastionHostKeyName:
+        Description: An existing EC2 Key Pair to allow SSH access to the bastion host
+        Type: AWS::EC2::KeyPair::KeyName
+        ConstraintDescription: Must be the name of an existing EC2 KeyPair
+
+Resources:
+    SecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties: 
+            GroupDescription: Allows SSH access from anywhere
+            SecurityGroupIngress: 
+            - CidrIp: 0.0.0.0/0
+              IpProtocol: tcp
+              FromPort: 22
+              ToPort: 22
+
+    BastionHost:
+        Type: AWS::EC2::Instance
+        Properties:
+            KeyName: !Ref BastionHostKeyName
+            InstanceType: t2.micro
+            SecurityGroups:
+            - !Ref SecurityGroup
+            ImageId: ami-123456
+
+Outputs:
+    BastionHostPublicDNS:
+        Description: Public DNS of the bastion host
+        Value: !GetAtt BastionHost.PublicDnsName

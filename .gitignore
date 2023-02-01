@@ -1,0 +1,32 @@
+### General
+.DS_Store
+error_log
+*.log
+
+### Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+
+### AWS
+.aws/
+
+### Golang
+bin/
+pkg/
+
+### Javascript
+node_modules/
+
+### Bash
+.bash_history
+
+### Pulumi
+.pulumi/
+
+### Python
+__pycache__/
+*.py[cod]
+
+# Virtual Environment
+.venv/

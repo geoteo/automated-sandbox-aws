@@ -1,0 +1,80 @@
+// Start a Pulumi Program
+import * as pulumi from "@pulumi/pulumi";
+
+// Load configuration from a centralized Pulumi Config object.
+const config = new pulumi.Config();
+
+// Create an AWS provider
+const provider = new pulumi.providers.aws.Provider("provider", {
+  region: config.require("region")
+})
+
+// Create VPC
+const vpc = new pulumi.aws.ec2.Vpc("vpc", {
+ cidrBlock: config.require("vpcCidrBlock"),
+}, { provider });
+
+// Create Public Subnet
+const pubSubnet = new pulumi.aws.ec2.Subnet("pub-subnet", {
+ vpcId: vpc.id,
+ cidrBlock: config.require("pubSubnetCidrBlock"),
+ mapPublicIpOnLaunch: true,
+}, { provider });
+
+// Create Private Subnet
+const priSubnet = new pulumi.aws.ec2.Subnet("pri-subnet", {
+ vpcId: vpc.id,
+ cidrBlock: config.require("priSubnetCidrBlock"),
+ mapPublicIpOnLaunch: false,
+}, { provider });
+
+// Create an EKS cluster
+const cluster = new pulumi.aws.eks.Cluster("cluster", {
+ vpcConfig: {
+  subnetIds: [pubSubnet.id, priSubnet.id]
+ },
+}, { provider });
+
+// Create security group for bastion host
+const bastionSecurityGroup = new pulumi.aws.ec2.SecurityGroup("bastionSecurityGroup", {
+ vpcId: vpc.id,
+ egress: [{ protocol: "-1", fromPort: 0, toPort: 0, cidrBlocks: ["0.0.0.0/0"] }],
+}, { provider });
+
+// Create bastion host
+const bastionHost = new pulumi.aws.ec2.Instance("bastionHost", {
+ instanceType: config.require("bastionHostInstanceType"),
+ subnetId: pubSubnet.id,
+ securityGroups: [bastionSecurityGroup.name],
+ keyName: config.require("keyName"),
+ ami: config.require("bastionHostAmi"),
+}, { provider });
+
+// Create security group for EKS nodes
+const workerSecurityGroup = new pulumi.aws.ec2.SecurityGroup("workerSecurityGroup", {
+ vpcId: vpc.id,
+ egress: [{ protocol: "-1", fromPort: 0, toPort: 0, cidrBlocks: ["0.0.0.0/0"] }],
+}, { provider });
+
+// Create EKS node group
+const nodeGroup = new pulumi.aws.eks.NodeGroup("nodeGroup", {
+ clusterName: cluster.name,
+ nodeGroupName: "nodeGroup",
+ nodeRoleArn: cluster.nodeRoleArn,
+ scalingConfig: {
+  minSize: 2,
+  maxSize: 3,
+ },
+ subnets: [pubSubnet.id, priSubnet.id],
+ instanceTypes: ["t3.small"],
+ amiType: "AL2_x86_64",
+ remoteAccess: {
+  ec2SshKey: config.require("keyName"),
+  sourceSecurityGroups: [workerSecurityGroup.name],
+ },
+}, { provider });
+
+// Create output to access the cluster information and bastion host info
+export const clusterEndpoint = pulumi.output(cluster.endpoint);
+export const clusterCertificateAuthorityData = pulumi.output(cluster.certificateAuthorityData);
+export const bastionPublicIp = pulumi.output(bastionHost.publicIp);

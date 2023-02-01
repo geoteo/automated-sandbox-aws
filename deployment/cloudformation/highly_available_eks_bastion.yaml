@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+#Generates a highly available EKS cluster and a Bastion Host for accessing it
+
+Resources:
+
+  VPC: 
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 192.168.0.0/16
+
+  SubnetPublicA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 192.168.0.0/24
+      AvailabilityZone: us-east-1a
+      VpcId: !Ref VPC
+      
+  SubnetPublicB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 192.168.1.0/24
+      AvailabilityZone: us-east-1b
+      VpcId: !Ref VPC
+
+  EksCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: EksCluster
+      RoleArn: !GetAtt MyEksInstanceRole.Arn
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !GetAtt EksClusterSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref SubnetPublicA 
+          - !Ref SubnetPublicB
+      Version: '1.17'
+
+  EksClusterSecurityGroup: 
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: EksClusterSecurityGroup
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+       
+  MyEksInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MyEksInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+               - ec2.amazonaws.com 
+            Action:
+             - sts:AssumeRole
+
+  EksInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref MyEksInstanceRole]
+
+  BastionHost:
+    Type: AWS::EC2::Instance
+    DependsOn: MyEksInstanceRole
+    Properties:
+      ImageId: ami-074b3e9f8fc6eebde
+      InstanceType: t2.micro
+      KeyName: !Ref MyKeyName
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      SubnetId: !Ref SubnetPublicA
+      IamInstanceProfile:
+        Name: !Ref EksInstanceProfile
+      UserData: 
+        Fn::Base64: 
+          Fn::Join: 
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "sudo yum -y update\n"
+            - "sudo amazon-linux-extras install -y epel\n"
+            - "sudo yum -y install kubectl\n"
+            - "sudo aws eks --region us-east-1 update-kubeconfig --name !Ref EksCluster\n"
+
+  BastionSecurityGroup:
+    Type: AWs::EC2::SecurityGroup
+    Properties:
+      GroupName: bastionSecurityGroup
+      VpcId: !Ref VPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0

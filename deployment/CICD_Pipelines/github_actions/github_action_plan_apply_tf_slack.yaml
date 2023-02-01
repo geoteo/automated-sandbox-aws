@@ -1,0 +1,30 @@
+name: Terraform and Slack
+
+on: [push]
+
+jobs:
+  build_and_notify:
+    runs-on: ubuntu-latest
+    #For Terraform
+    steps:
+    - uses: actions/checkout@v2
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform-version: 0.12.29
+    - name: Plan Terraform
+      run: terraform plan
+    - name: Apply Terraform
+      run: terraform apply -auto-approve
+    #For Slack
+    - name: Send Slack Notification
+      uses: demophoon/slack-notify@master
+      with:
+        webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        slack-message: Terraform has been applied.
