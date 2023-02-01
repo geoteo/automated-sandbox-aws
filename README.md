@@ -1,53 +1,92 @@
-AWS CLI v2 Installation
-=======================
+Deployment of a High-Availability EKS Cluster with a WebShell using IAC Solutions
+=================================================================================
 
-This guide will show how to install AWS CLI v2 on a Linux environment.
+This GitHub repository contains the necessary code and configurations to deploy a highly-available Amazon Elastic Container Service for Kubernetes (EKS) cluster in AWS, as well as a WebShell, using various Infrastructure as Code (IAC) solutions. The repository is intended to assist Sales Engineers in quickly accessing a sandboxed EKS environment to showcase the speed and ease of deploying the Dynatrace Operator onto any Kubernetes cluster.
+
+
+Technologies Used
+-----------------
+
+-   AWS CloudFormation
+-   Terraform
+-   GitHub Actions with Slack Notifications
+-   Pulumi
+-   Custom Bash Scripts
 
 Prerequisites
 -------------
 
-Before you get started, make sure your machine has:
+-   An AWS account
+-   AWS CLI installed and configured
+-   Terraform CLI installed
+-   Pulumi CLI installed
+-   Basic knowledge of AWS, Terraform, Pulumi, and GitHub Actions
 
-*   `curl`
-*   `unzip`
+Code Overview
+-------------
 
-Installation
-------------
+The repository contains the following directories:
 
-Follow the steps below to install AWS CLI v2:
+-   `cloudformation`: contains the AWS CloudFormation templates for deploying the EKS cluster
+-   `terraform`: contains the Terraform code for deploying the EKS cluster and WebShell
+-   `pulumi`: contains the Pulumi code for deploying the EKS cluster
+-   `github_actions`: contains the GitHub Actions workflow for deploying the EKS cluster using Terraform and sending Slack notifications
+-   `bash_scripts`: contains custom bash scripts for automating the deployment process
 
-1.  Download AWS CLI v2 package:  
-    `curl -L "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"`
-2.  Unzip the package:  
-    `unzip awscliv2.zip`
-3.  Install the package:  
-    `./aws/install`
+Deployment Steps
+----------------
 
-Verifying Your Installation
----------------------------
+1.  Clone the repository
 
-Once the installation is complete, you can check the AWS CLI version by running the following command:  
-`aws --version`
+`$ git clone https://github.com/[YOUR_USERNAME]/[REPO_NAME].git`
+
+1.  Navigate to the appropriate directory based on the IAC solution you wish to use (e.g. `terraform`)
+
+`$ cd terraform`
+
+1.  Run the appropriate deployment command based on the IAC solution you are using
+
+-   Terraform:
+
+`$ terraform init
+$ terraform apply`
+
+-   Pulumi:
+
+`$ pulumi up`
+
+-   AWS CloudFormation:
+
+`$ aws cloudformation create-stack --stack-name [STACK_NAME] --template-body file://[TEMPLATE_FILE]`
+
+-   GitHub Actions: Commit and push the changes to your repository to trigger the GitHub Actions workflow.
+
+WebShell Access
+---------------
+
+After deploying the EKS cluster and WebShell, you can access the WebShell via the public IP or DNS of any of the worker nodes. The default credentials are:
+
+-   username: `student`
+-   password: `student`
+
+Clean Up
+--------
+
+To clean up the resources created during the deployment process, run the appropriate command based on the IAC solution you used:
+
+-   Terraform:
+
+`$ terraform destroy`
+
+-   Pulumi:
+
+`$ pulumi destroy`
+
+-   AWS CloudFormation:
+
+`$ aws cloudformation delete-stack --stack-name [STACK_NAME]`
 
 Conclusion
 ----------
 
-After following the steps above, AWS CLI v2 is sucessfully installed on your machine. Enjoy using and managing your AWS resources using the AWS CLI!
-
-
-# Uninstall Script for AWS CLI v2
-
-Uninstall Prerequisites
------------------------
-
-echo "Uninstalling prerequisites..."  
-aptget remove -y curl unzip
-
-Uninstall AWS CLI v2
---------------------
-
-echo "Uninstalling AWS CLI v2..."  
-./aws/uninstall  
-rm -rf awscliv2.zip aws/
-
-echo "AWS CLI v2 has been successfully uninstalled!"
+By using the code and configurations in this repository, Sales Engineers can quickly deploy a highly-available EKS cluster in AWS along with a WebShell, reducing the amount of time it takes to showcase the speed and ease of deploying the Dynatrace Operator onto any Kubernetes cluster.
