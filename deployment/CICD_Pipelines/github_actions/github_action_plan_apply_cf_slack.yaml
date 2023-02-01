@@ -1,0 +1,29 @@
+name: Cloudformation and Slack
+
+on:
+  push:
+    branches:
+      - master
+
+name: Cloudformation and Slack Notification
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@master
+
+    - name: Plan and Apply Cloudformation Template
+      uses: lukehoban/cfn-deploy-action@master
+      with:
+        stack-name: sample-cfn-stack
+        template-file: template.yml
+        parameters-file: parameters.yaml
+        region: us-east-1
+
+    - name: notify on Slack
+      uses: rtChef/slack-notification@master
+      with:
+        webhook-url: webhookurlgoeshere
+        message: Cloudformation Template Plan/Apply Completed

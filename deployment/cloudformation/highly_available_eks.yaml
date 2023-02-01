@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: 'This template builds a highly available EKS cluster'
+
+Resources: 
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      InstanceTenancy: default
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+  
+  Subnet1:     
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Subnet1CIDR
+      AvailabilityZone: !Ref AvailabilityZone1
+      MapPublicIpOnLaunch: 'true'
+  
+  Subnet2:     
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Subnet2CIDR
+      AvailabilityZone: !Ref AvailabilityZone2
+      MapPublicIpOnLaunch: 'true' 
+  
+  InternetGateway:    
+    Type: AWS::EC2::InternetGateway     
+ 
+  GatewayAttachment:  
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  
+  RouteTable:    
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  
+  Route:  
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  
+  Subnet1RouteTableAssociation:  
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet1
+      RouteTableId: !Ref RouteTable
+  
+  Subnet2RouteTableAssociation:  
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet2
+      RouteTableId: !Ref RouteTable
+  
+  EKSHostSecurityGroup:  
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Security group for EKS control plane'
+      VpcId: !Ref VPC
+  
+  Cluster:  
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref ClusterName
+      RoleArn: !GetAtt [EKSRole, Arn]
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !Ref EKSHostSecurityGroup
+        SubnetIds:
+          - !Ref Subnet1
+          - !Ref Subnet2
+  
+  EKSRole:  
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref ClusterName
+      AssumeRolePolicyDocument:
+        Statement: 
+          - Effect: Allow
+            Principal: 
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: '/'
+  
+  # Allow cluster control plane to manage EKS resources
+  EKSServicePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Ref ClusterName
+      Roles: [!Ref EKSRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 
+              - 'eks:*'
+            Resource: '*'
+Parameters:
+  VpcCIDR:
+    Description: Enter a VPC CIDR range
+    Type: String
+    
+  Subnet1CIDR:
+    Description: Enter a CIDR block for the first subnet
+    Type: String
+    
+  Subnet2CIDR:
+    Description: Enter a CIDR block for the second subnet
+    Type: String
+    
+  AvailabilityZone1:
+    Description: Enter the first availability zone
+    Type: String
+    
+  AvailabilityZone2:
+    Description: Enter the second availability zone
+    Type: String
+    
+  ClusterName:
+    Description: Enter the name of the EKS cluster
+    Type: String
