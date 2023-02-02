@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Deploys Kubernetes, webshell deployment, and webshell service in a custom
+VPC with HA and IAM configs
+
+Resources:
+  # Create VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+
+  # Create Subnets
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1a
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1b
+  Subnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.2.0/24
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1c
+
+  #Create Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: {}
+
+  #Attach Internet Gateway to VPC
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DependsOn: InternetGateway
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Create Route Table
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  #Create Route Table Association
+  RouteTableAssociation1: 
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn: RouteTable
+    Properties:
+      SubnetId: !Ref Subnet1
+      RouteTableId: !Ref RouteTable
+  RouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn: RouteTable
+    Properties:
+      SubnetId: !Ref Subnet2
+      RouteTableId: !Ref RouteTable
+  RouteTableAssociation3:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn: RouteTable
+    Properties:
+      SubnetId: !Ref Subnet3
+      RouteTableId: !Ref RouteTable
+
+  # Create Gateway Route
+  GatewayRoute:
+     Type: AWS::EC2::Route
+     DependsOn: VPCGatewayAttachment
+     Properties:
+       RouteTableId: !Ref RouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref InternetGateway
+
+  #Create an EKS Cluster
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: EKS-Cluster
+      RoleArn: arn:aws:iam::xxxxx:role/eks-role
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+        - sg-xxx
+        SubnetIds:
+        - !Ref Subnet1
+        - !Ref Subnet2
+        - !Ref Subnet3
+      Version: '1.23'
+
+  # Create an IAM role for nodes
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EKSNodeGroupRole
+
+  EKSNodeGroupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: eks-node-group-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies: 
+        - 
+          PolicyName: AmazonEKSNodePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:Describe*'
+                  - 'ec2:AttachVolume'
+                  - 'ec2:DetachVolume'
+                  - 'ec2:CreateVolume' 
+                  - 'ec2:CreateNetworkInterface' 
+                  - 'ec2:DeleteNetworkInterface' 
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DescribeVolumes' 
+                  - 'ec2:DescribeVolumeAttribute' 
+                  - 'ec2:DescribeVolumeStatus'
+                Resource: '*'
+
+  # Create EKS Node Group
+  EKSNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref EKSCluster
+      DiskSize: 20
+      InstanceTypes:
+        - t2.medium
+      NodegroupName: eks-nodegroup
+      ReleaseVersion: '1.12'
+      ScalingConfig:
+        DesiredSize: 2
+        MaxSize: 5
+        MinSize: 2
+      Subnets: 
+        - !Ref Subnet1
+        - !Ref Subnet2
+        - !Ref Subnet3
+      RemoteAccess:
+        Ec2SshKey: "<key-pair-name>"
+      IamInstanceProfile: !Ref NodeInstanceProfile
+
+  # Deploys webshell
+  WebShellDeployment:
+    Type: AWS::EKS::Deployment
+    Properties:
+      ClusterName: !Ref EKSCluster
+      Resources:
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            labels:
+              service: webshell
+            name: webshell
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                service: webshell
+            template:
+              spec:
+                containers:
+                  - image: <container-image>
+                    name: webshell
+      Services:
+        - kind: Service
+          apiVersion: v1
+          metadata:
+            name: webshell-service
+          spec:
+            ports:
+            - port: 8080
+              targetPort: 8080
+            selector:
+              service: webshell
+
+Outputs:
+  EKSClusterName:
+    Value: !Ref EKSCluster
+  NodeGroup:
+    Value: !Ref EKSNodeGroup
