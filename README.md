@@ -66,8 +66,8 @@ WebShell Access
 
 After deploying the EKS cluster and WebShell, you can access the WebShell via the public IP or DNS of any of the worker nodes. The default credentials are:
 
--   username: `student`
--   password: `student`
+-   username: `sandbox`
+-   password: `sandbox`
 
 Clean Up
 --------
