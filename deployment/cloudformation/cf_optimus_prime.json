@@ -1,0 +1,189 @@
+//Create a custom VPC with a private, public, and database subnet
+
+AWS CloudFormation Template:
+
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16"
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "CidrBlock": "10.0.0.0/24",
+        "AvailabilityZone": "us-west-2a"
+      }
+    },
+    "PrivateSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "CidrBlock": "10.0.1.0/24",
+        "AvailabilityZone": "us-west-2a"
+      }
+    },
+    "DatabaseSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "CidrBlock": "10.0.2.0/24",
+        "AvailabilityZone": "us-west-2a"
+      }
+    }
+  }
+}
+
+//Create an Amazon Elastic Kubernetes (EKS) cluster
+
+AWS CloudFormation Template:
+
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "EKSCluster": {
+            "Type": "AWS::EKS::Cluster",
+            "Properties": {
+                "Name": "My-EKS",
+                "ResourcesVpcConfig": {
+                    "SubnetIds": [
+                        { "Ref": "PublicSubnet" },
+                        { "Ref": "PrivateSubnet" },
+                        { "Ref": "DatabaseSubnet" }
+                    ],
+                    "SecurityGroupIds": [
+                      { "Ref": "MySecurityGroup" }
+                    ],
+                    "ClusterSecurityGroupId": {
+                      "Ref": "MySecurityGroup"
+                    }
+                }
+            }
+        },
+    }
+}
+
+//Create IAM roles and security groups for used for the Amazon EKS Cluster
+
+AWS CloudFormation Template:
+
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "EKSCNA access role": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "eks.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+                ], 
+            }
+        },
+        "EKSCNB access role": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "eks.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEKSCNBPolicy"
+                ],
+            }
+        },
+        "MySecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security Group for EKS Cluster",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": "0",
+                        "ToPort": "65535",
+                        "CidrIp": "192.168.0.0/16"
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": "0",
+                        "ToPort": "65535",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        }
+    }
+}
+
+//Create Kubernetes manifest resources such as a deployment and a service
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-container
+          image: my-container-image
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  selector:
+    app: my-app
+  ports:
+    # Label the port with a 'name':
+    # line that is descriptive,
+    # like 'http'
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: NodePort
